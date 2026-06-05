@@ -1,0 +1,90 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="description" content="Locate examination and event halls around the University of Bamenda with search, maps, and turn-by-turn directions.">
+    <meta name="theme-color" content="#0a3d2e">
+    <title>{% block title %}SHU Hall Finder{% endblock %} · University of Bamenda</title>
+
+    <link href="{% static 'finder/vendor/bootstrap.min.css' %}" rel="stylesheet">
+    <link href="{% static 'finder/vendor/bootstrap-icons.min.css' %}" rel="stylesheet">
+    <link href="{% static 'finder/vendor/leaflet.min.css' %}" rel="stylesheet">
+    <link href="{% static 'finder/css/style.css' %}" rel="stylesheet">
+    {% block extra_head %}{% endblock %}
+</head>
+
+<body id="body" class="app-body d-flex flex-column min-vh-100">
+    <a class="skip-link visually-hidden-focusable" href="#main-content">Skip to map</a>
+
+    <header class="app-header sticky-top">
+        <nav class="navbar navbar-expand-lg navbar-dark py-2 py-lg-3">
+            <div class="container-fluid container-xl">
+                <a class="navbar-brand d-flex align-items-center gap-2 gap-md-3" href="{% url 'home' %}">
+                    <span class="brand-mark" aria-hidden="true">
+                        <i class="bi bi-geo-alt-fill"></i>
+                    </span>
+                    <span>
+                        <span class="brand-title d-block">SHU Hall Finder</span>
+                        <span class="brand-sub d-none d-md-block">University of Bamenda · campus navigation</span>
+                    </span>
+                </a>
+
+                <div class="d-flex align-items-center flex-wrap gap-2 ms-auto justify-content-end">
+                    {% if user.is_authenticated and user.is_staff %}
+                        <a class="btn btn-outline-light btn-sm" href="{% url 'staff_dashboard' %}">
+                            <i class="bi bi-gear-fill me-1"></i><span class="d-none d-sm-inline">Manage halls</span><span class="d-inline d-sm-none">Manage</span>
+                        </a>
+                        <form method="post" action="{% url 'logout' %}" class="d-inline m-0">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-outline-light btn-sm">Log out</button>
+                        </form>
+                    {% elif user.is_authenticated %}
+                        <span class="navbar-text small text-white-50 d-none d-sm-inline">{{ user.get_username }}</span>
+                        <form method="post" action="{% url 'logout' %}" class="d-inline m-0">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-outline-light btn-sm">Log out</button>
+                        </form>
+                    {% else %}
+                        <a class="btn btn-outline-light btn-sm" href="{% url 'login' %}">
+                            <i class="bi bi-shield-lock me-1"></i> Staff login
+                        </a>
+                    {% endif %}
+                    <button type="button" class="btn btn-theme-toggle" id="themeToggle" aria-label="Toggle dark mode">
+                        <i class="bi bi-moon-stars" id="themeIcon"></i>
+                    </button>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <main id="main-content" class="app-main flex-grow-1">
+        {% if messages %}
+        <div class="container-xl pt-3">
+            {% for message in messages %}
+            <div class="alert alert-{% if message.tags == 'error' %}danger{% elif message.tags == 'debug' %}secondary{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show shadow-sm" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="app-footer py-3 mt-auto d-none d-md-block">
+        <div class="container-xl text-center text-md-start d-flex flex-column flex-md-row justify-content-between align-items-center gap-2">
+            <p class="mb-0 small text-muted">Built for students and staff navigating SHU campuses. Verify hall details with your department.</p>
+            <p class="mb-0 small"><span class="text-muted">Data ©</span> University community · <span class="text-muted">Maps ©</span> <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" class="footer-link">OpenStreetMap</a></p>
+        </div>
+    </footer>
+
+    <div id="toastHost" class="toast-host" aria-live="polite" aria-atomic="true"></div>
+
+    <script src="{% static 'finder/vendor/bootstrap.bundle.min.js' %}"></script>
+    <script src="{% static 'finder/vendor/leaflet.min.js' %}"></script>
+    <script src="{% static 'finder/js/main.js' %}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

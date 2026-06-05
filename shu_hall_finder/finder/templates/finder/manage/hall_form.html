@@ -1,0 +1,110 @@
+{% extends "finder/base.html" %}
+
+{% block title %}{% if object %}Edit{% else %}Add{% endif %} hall{% endblock %}
+
+{% block content %}
+<div class="container-xl py-4">
+    <div class="mb-4">
+        <a href="{% url 'hall_manage_list' %}" class="small text-decoration-none">&larr; Back to list</a>
+        <h1 class="h2 panel-title mt-2 mb-0">{% if object %}Edit “{{ object.name }}”{% else %}Add a hall{% endif %}</h1>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="glass-card p-4">
+                <form method="post" enctype="multipart/form-data" novalidate>
+                    {% csrf_token %}
+
+                    {% if form.non_field_errors %}
+                    <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                    {% endif %}
+
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <label class="form-label fw-semibold" for="{{ form.name.id_for_label }}">{{ form.name.label }}</label>
+                            {{ form.name }}
+                            {% if form.name.errors %}<div class="invalid-feedback d-block">{{ form.name.errors.0 }}</div>{% endif %}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold" for="{{ form.slug.id_for_label }}">{{ form.slug.label }}</label>
+                            {{ form.slug }}
+                            {% if form.slug.help_text %}<div class="form-text">{{ form.slug.help_text }}</div>{% endif %}
+                            {% if form.slug.errors %}<div class="invalid-feedback d-block">{{ form.slug.errors.0 }}</div>{% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold" for="{{ form.latitude.id_for_label }}">{{ form.latitude.label }}</label>
+                            {{ form.latitude }}
+                            {% if form.latitude.help_text %}<div class="form-text">{{ form.latitude.help_text }}</div>{% endif %}
+                            {% if form.latitude.errors %}<div class="invalid-feedback d-block">{{ form.latitude.errors.0 }}</div>{% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold" for="{{ form.longitude.id_for_label }}">{{ form.longitude.label }}</label>
+                            {{ form.longitude }}
+                            {% if form.longitude.help_text %}<div class="form-text">{{ form.longitude.help_text }}</div>{% endif %}
+                            {% if form.longitude.errors %}<div class="invalid-feedback d-block">{{ form.longitude.errors.0 }}</div>{% endif %}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold" for="{{ form.address.id_for_label }}">{{ form.address.label }}</label>
+                            {{ form.address }}
+                            {% if form.address.errors %}<div class="invalid-feedback d-block">{{ form.address.errors.0 }}</div>{% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold" for="{{ form.campus_zone.id_for_label }}">{{ form.campus_zone.label }}</label>
+                            {{ form.campus_zone }}
+                            {% if form.campus_zone.errors %}<div class="invalid-feedback d-block">{{ form.campus_zone.errors.0 }}</div>{% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold" for="{{ form.capacity.id_for_label }}">{{ form.capacity.label }}</label>
+                            {{ form.capacity }}
+                            {% if form.capacity.errors %}<div class="invalid-feedback d-block">{{ form.capacity.errors.0 }}</div>{% endif %}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold" for="{{ form.description.id_for_label }}">{{ form.description.label }}</label>
+                            {{ form.description }}
+                            {% if form.description.errors %}<div class="invalid-feedback d-block">{{ form.description.errors.0 }}</div>{% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold" for="{{ form.phone.id_for_label }}">{{ form.phone.label }}</label>
+                            {{ form.phone }}
+                            {% if form.phone.errors %}<div class="invalid-feedback d-block">{{ form.phone.errors.0 }}</div>{% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold" for="{{ form.amenities.id_for_label }}">{{ form.amenities.label }}</label>
+                            {{ form.amenities }}
+                            {% if form.amenities.errors %}<div class="invalid-feedback d-block">{{ form.amenities.errors.0 }}</div>{% endif %}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold d-block" for="{{ form.image.id_for_label }}">{{ form.image.label }}</label>
+                            {{ form.image }}
+                            {% if form.image.help_text %}<div class="form-text">{{ form.image.help_text }}</div>{% endif %}
+                            {% if form.image.errors %}<div class="invalid-feedback d-block">{{ form.image.errors.0 }}</div>{% endif %}
+                            {% if object and object.image %}
+                            <div class="mt-2">
+                                <span class="small text-muted">Current:</span><br>
+                                <img src="{{ object.image.url }}" alt="" class="img-thumbnail mt-1" style="max-height: 160px;">
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                {{ form.is_featured }}
+                                <label class="form-check-label" for="{{ form.is_featured.id_for_label }}">{{ form.is_featured.label }}</label>
+                            </div>
+                            <div class="form-check">
+                                {{ form.is_active }}
+                                <label class="form-check-label" for="{{ form.is_active.id_for_label }}">{{ form.is_active.label }}</label>
+                            </div>
+                            <div class="form-text">Inactive halls are hidden from the public map and API.</div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-2 mt-4">
+                        <button type="submit" class="btn btn-accent">Save hall</button>
+                        <a class="btn btn-outline-secondary" href="{% url 'hall_manage_list' %}">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

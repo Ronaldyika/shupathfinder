@@ -1,0 +1,221 @@
+{% extends 'finder/base.html' %}
+{% load static %}
+
+{% block title %}Find a Hall{% endblock %}
+
+{% block content %}
+
+{{ hall_data|json_script:"hall-data" }}
+
+<div class="hall-finder-container" id="hallFinderApp">
+    <!-- Map panel -->
+    <section class="map-section" aria-label="Campus map">
+        <div id="map" class="leaflet-map" role="application" aria-label="Interactive campus map powered by OpenStreetMap"></div>
+
+        <div class="map-overlay-top">
+            <div class="map-attribution-badge d-none d-sm-flex">
+                <i class="bi bi-layers-fill"></i>
+                <span>OpenStreetMap</span>
+            </div>
+        </div>
+
+        <div class="map-controls-top" role="toolbar" aria-label="Map controls">
+            <button type="button" id="btnFitAll" class="map-btn" title="Show all halls" aria-label="Fit all halls on map">
+                <i class="bi bi-bounding-box" aria-hidden="true"></i>
+            </button>
+            <button type="button" id="btnLocateMe" class="map-btn" title="Show my location" aria-label="Locate me">
+                <i class="bi bi-crosshair" aria-hidden="true"></i>
+            </button>
+            <button type="button" id="btnZoomIn" class="map-btn" title="Zoom in" aria-label="Zoom in">
+                <i class="bi bi-plus-lg" aria-hidden="true"></i>
+            </button>
+            <button type="button" id="btnZoomOut" class="map-btn" title="Zoom out" aria-label="Zoom out">
+                <i class="bi bi-dash-lg" aria-hidden="true"></i>
+            </button>
+        </div>
+
+        <button type="button" class="btn btn-primary btn-panel-toggle d-lg-none" id="btnTogglePanel" aria-expanded="true" aria-controls="finderSidebar">
+            <i class="bi bi-list-ul me-1" aria-hidden="true"></i>
+            <span id="panelToggleLabel">Halls</span>
+        </button>
+    </section>
+
+    <!-- Sidebar panel -->
+    <aside class="sidebar" id="finderSidebar" aria-label="Hall search and details">
+        <div class="sidebar-header">
+            <div class="d-flex align-items-start justify-content-between gap-2">
+                <div>
+                    <h1 class="sidebar-title mb-1">Find Halls</h1>
+                    <p class="sidebar-subtitle mb-0">Search and navigate to examination halls</p>
+                </div>
+                <button type="button" class="btn btn-sidebar-close d-lg-none" id="btnClosePanel" aria-label="Close panel">
+                    <i class="bi bi-chevron-down"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="sidebar-content">
+            <!-- Search -->
+            <div class="search-section">
+                <label class="visually-hidden" for="hallSearchInput">Search halls</label>
+                <div class="search-group input-group">
+                    <span class="input-group-text border-0 bg-transparent ps-3">
+                        <i class="bi bi-search text-muted"></i>
+                    </span>
+                    <input
+                        type="search"
+                        id="hallSearchInput"
+                        class="form-control search-input border-0 shadow-none"
+                        placeholder="Search by name, zone, amenities…"
+                        autocomplete="off"
+                    >
+                </div>
+                <div class="zone-filter mt-3">
+                    <label class="filter-label form-label mb-1" for="zoneFilter">Campus zone</label>
+                    <select id="zoneFilter" class="form-select zone-select">
+                        <option value="">All zones</option>
+                        {% for z in zones %}
+                        <option value="{{ z }}">{{ z }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <!-- Results list -->
+            <div class="results-section" id="resultsSection">
+                <div class="results-header">
+                    <h2 class="results-title mb-0">Results</h2>
+                    <span class="badge rounded-pill results-count" id="hallCountLabel">{{ halls|length }} halls</span>
+                </div>
+                <div id="hallResults" class="results-list" role="list"></div>
+            </div>
+
+            <!-- Selected hall details -->
+            <div class="hall-details-section" id="hallDetailsSection" hidden>
+                <div class="details-header">
+                    <h3 class="details-title mb-0" id="hallDetailTitle">Select a hall</h3>
+                    <div class="details-header-actions">
+                        <div class="travel-mode-badge" id="travelModeBadge" hidden>
+                            <i class="bi bi-person-walking" id="travelModeIcon" aria-hidden="true"></i>
+                            <span id="travelModeBadgeLabel">Walk</span>
+                        </div>
+                        <button type="button" class="btn-close-details" id="btnCloseDetails" aria-label="Close hall details">
+                            <i class="bi bi-x-lg" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="details-scroll-container">
+                    <div class="details-content">
+                        <div class="details-image ratio ratio-16x9 rounded-3 overflow-hidden mb-3">
+                            <img id="hallDetailImage" src="" alt="" class="object-fit-cover d-none">
+                            <div id="hallImagePlaceholder" class="image-placeholder-icon">
+                                <i class="bi bi-building" aria-hidden="true"></i>
+                            </div>
+                        </div>
+                        <div class="details-info">
+                            <p class="detail-meta mb-1" id="hallDetailMeta"></p>
+                            <p class="detail-address mb-2" id="hallDetailAddress"></p>
+                            <p class="detail-description mb-3" id="hallDetailDesc"></p>
+                            <div class="detail-specs row g-2 mb-3">
+                                <div class="col-6">
+                                    <div class="spec-item h-100">
+                                        <span class="spec-label">Capacity</span>
+                                        <span class="spec-value" id="hallDetailCapacity">—</span>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="spec-item h-100">
+                                        <span class="spec-label">Phone</span>
+                                        <span class="spec-value" id="hallDetailPhone">—</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <p class="detail-amenities mb-0">
+                                <span class="label">Amenities:</span>
+                                <span id="hallDetailAmenities">Not listed</span>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="travel-mode-section" id="travelModeSection" hidden>
+                    <label class="travel-label">Travel mode</label>
+                    <div class="travel-options" role="group" aria-label="Travel mode">
+                        <button type="button" class="travel-btn active" data-mode="foot-walking">
+                            <i class="bi bi-person-walking" aria-hidden="true"></i>
+                            <span>Walk</span>
+                        </button>
+                        <button type="button" class="travel-btn" data-mode="driving-car">
+                            <i class="bi bi-car-front" aria-hidden="true"></i>
+                            <span>Drive</span>
+                        </button>
+                        <button type="button" class="travel-btn" data-mode="cycling-regular">
+                            <i class="bi bi-bicycle" aria-hidden="true"></i>
+                            <span>Bike</span>
+                        </button>
+                    </div>
+                    <div class="route-info" id="routeInfo" hidden>
+                        <p class="route-mode mb-1" id="routeModeInfo">
+                            <i class="bi bi-arrow-right-circle" aria-hidden="true"></i>
+                            <span id="routeModeLabel">Walk</span>
+                        </p>
+                        <p class="route-duration mb-1">
+                            <i class="bi bi-clock" aria-hidden="true"></i>
+                            <span id="routeDuration">—</span>
+                        </p>
+                        <p class="route-distance mb-0">
+                            <i class="bi bi-arrows-move" aria-hidden="true"></i>
+                            <span id="routeDistance">—</span>
+                        </p>
+                    </div>
+                </div>
+
+                <div class="details-actions-sticky">
+                    <button type="button" class="btn btn-primary btn-lg w-100" id="btnGetDirections">
+                        <i class="bi bi-signpost-2 me-2" aria-hidden="true"></i>Get Directions
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary w-100 mt-2" id="btnClearRoute" hidden>
+                        <i class="bi bi-x-lg me-2" aria-hidden="true"></i>Clear Route
+                    </button>
+                </div>
+            </div>
+
+            <div class="sidebar-footer">
+                <p class="footer-text mb-0">
+                    <i class="bi bi-map me-1" aria-hidden="true"></i>
+                    Maps © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a>
+                    · Routing via OpenRouteService
+                </p>
+            </div>
+        </div>
+    </aside>
+</div>
+
+<!-- Route instructions modal -->
+<div class="modal fade" id="routeModal" tabindex="-1" aria-labelledby="routeModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold" id="routeModalLabel">Route instructions</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body pt-2">
+                <div id="routeInstructionsList" class="instructions-list"></div>
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    window.ORS_API_KEY = "{{ ors_api_key|escapejs }}";
+    window.HALL_DATA = JSON.parse(document.getElementById('hall-data').textContent);
+</script>
+<script src="{% static 'finder/js/map.js' %}"></script>
+{% endblock %}

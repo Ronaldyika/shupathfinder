@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: shu-hall-finder
+    env: python
+    plan: free
+    branch: main
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn shu_hall_finder.wsgi --log-file -
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: DJANGO_SETTINGS_MODULE
+        value: shu_hall_finder.settings
+      - key: DEBUG
+        value: "False"
+      - key: SECRET_KEY
+        value: "replace-with-a-secret-key"
+      - key: ALLOWED_HOSTS
+        value: "yourapp.onrender.com"
+      - key: DATABASE_URL
+        value: ""
+      - key: CSRF_TRUSTED_ORIGINS
+        value: "https://yourapp.onrender.com"
+      - key: ORS_API_KEY
+        value: ""

@@ -1,0 +1,1 @@
+web: gunicorn shu_hall_finder.wsgi --log-file -
