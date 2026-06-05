@@ -11,8 +11,6 @@ __pycache__/
 *.log
 *.pot
 *.pyc
-/staticfiles/
-/media/
 
 # Node
 node_modules/
