@@ -374,6 +374,9 @@
         return `<div class="hall-popup">
             <div class="popup-title">${escapeHtml(h.name)}</div>
             <div class="popup-meta">${escapeHtml(hallMetaLine(h) || h.address || "")}</div>
+            <div class="popup-actions mt-2">
+                <button type="button" class="btn btn-sm btn-outline-primary" onclick="window.openHallAbout && window.openHallAbout(${h.id})">About</button>
+            </div>
         </div>`;
     }
 
@@ -563,7 +566,10 @@
                     <div class="result-item-meta">${escapeHtml(hallMetaLine(h))}</div>
                     <p class="result-item-address">${escapeHtml(h.address || "No address")}</p>
                 </div>
-                <span class="result-action-btn" title="Get directions" aria-hidden="true"><i class="bi bi-signpost-2"></i></span>
+                <div class="result-actions">
+                    <button class="btn btn-sm btn-outline-secondary result-about-btn" title="About">About</button>
+                    <span class="result-action-btn" title="Get directions" aria-hidden="true"><i class="bi bi-signpost-2"></i></span>
+                </div>
             </article>`
             )
             .join("");
@@ -588,6 +594,14 @@
                     selectHall(hall);
                     findRoute();
                 }
+            });
+        });
+        resultsList.querySelectorAll(".result-about-btn").forEach((btn) => {
+            btn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const item = btn.closest(".result-item");
+                const hall = hallsById[parseInt(item?.dataset.hallId, 10)];
+                if (hall) openHallAbout(hall);
             });
         });
     }
@@ -666,6 +680,50 @@
         updateRouteActionButtons(!!currentRoute);
         updateTravelModeDisplay();
     }
+
+    function openHallAbout(h) {
+        const hall = typeof h === 'object' ? h : hallsById[parseInt(h, 10)];
+        if (!hall) return;
+        try {
+            const title = document.getElementById('hallAboutTitle');
+            const meta = document.getElementById('hallAboutMeta');
+            const desc = document.getElementById('hallAboutDesc');
+            const addr = document.getElementById('hallAboutAddress');
+            const phone = document.getElementById('hallAboutPhone');
+            const amenities = document.getElementById('hallAboutAmenities');
+            const img = document.getElementById('hallAboutImage');
+            const imgPlace = document.getElementById('hallAboutImagePlaceholder');
+
+            if (title) title.textContent = hall.name || 'Hall';
+            if (meta) meta.textContent = `${hall.campus_zone || 'Campus'} • ${hall.capacity ? hall.capacity + ' seats' : 'N/A'}`;
+            if (desc) desc.textContent = hall.description || 'No description available.';
+            if (addr) addr.textContent = hall.address || 'N/A';
+            if (phone) phone.textContent = hall.phone || 'N/A';
+            if (amenities) amenities.textContent = hall.amenities || 'Not listed';
+
+            if (img && imgPlace) {
+                if (hall.image) {
+                    img.src = hall.image;
+                    img.alt = hall.name;
+                    img.classList.remove('d-none');
+                    imgPlace.classList.add('d-none');
+                } else {
+                    img.classList.add('d-none');
+                    imgPlace.classList.remove('d-none');
+                }
+            }
+
+            if (typeof bootstrap !== 'undefined') {
+                const m = new bootstrap.Modal(document.getElementById('hallAboutModal'));
+                m.show();
+            } else {
+                alert(`${hall.name}\n\n${hall.description || ''}`);
+            }
+        } catch (e) {
+            console.warn('openHallAbout error', e);
+        }
+    }
+    window.openHallAbout = openHallAbout;
 
     function clearSelection() {
         selectedHall = null;
