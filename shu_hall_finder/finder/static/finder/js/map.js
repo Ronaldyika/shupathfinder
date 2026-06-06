@@ -687,7 +687,14 @@
             }
         }
 
-        routeLayer.bringToFront();
+        if (routeLayer && typeof routeLayer.eachLayer === "function") {
+            routeLayer.eachLayer((child) => {
+                if (child && typeof child.bringToFront === "function") {
+                    child.bringToFront();
+                }
+            });
+        }
+
         currentRoute = routeFeature;
     }
 
