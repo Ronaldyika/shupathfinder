@@ -31,6 +31,17 @@
     const ROUTE_LOCAL_MAX_M = 15000;
     let currentTravelMode = "foot-walking";
     let resizeObserver = null;
+    let gpsWatchId = null;
+    let routeCoordinates = [];
+    let routeSteps = [];
+    // Defensive globals: expose to window so other scripts can't cause ReferenceError
+    try {
+        if (typeof window.lastNotifiedStep === "undefined") window.lastNotifiedStep = -1;
+        if (typeof window.routeSteps === "undefined") window.routeSteps = [];
+    } catch (e) {
+        // ignore
+    }
+    let lastNotifiedStep = -1;
 
     // ---- Utilities ----
 
@@ -146,6 +157,123 @@
 
     function toDeg(rad) {
         return (rad * 180) / Math.PI;
+    }
+
+    function calcDistance(from, to) {
+        const lat1 = toRad(from.lat);
+        const lat2 = toRad(to.lat);
+        const dLat = lat2 - lat1;
+        const dLng = toRad(to.lng - from.lng);
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                  Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        const R = 6371000;
+        return R * c;
+    }
+
+    function findClosestRoutePoint(userPos) {
+        if (!routeCoordinates.length) return null;
+        let minDist = Infinity;
+        let closestIdx = 0;
+        routeCoordinates.forEach((coord, idx) => {
+            const dist = calcDistance(userPos, { lat: coord[0], lng: coord[1] });
+            if (dist < minDist) {
+                minDist = dist;
+                closestIdx = idx;
+            }
+        });
+        return { index: closestIdx, distance: minDist };
+    }
+
+    function getDistanceAlongRoute(userPos) {
+        const closest = findClosestRoutePoint(userPos);
+        if (!closest) return 0;
+        let dist = 0;
+        for (let i = 0; i < closest.index; i++) {
+            const from = { lat: routeCoordinates[i][0], lng: routeCoordinates[i][1] };
+            const to = { lat: routeCoordinates[i + 1][0], lng: routeCoordinates[i + 1][1] };
+            dist += calcDistance(from, to);
+        }
+        const lastSegFrom = { lat: routeCoordinates[closest.index][0], lng: routeCoordinates[closest.index][1] };
+        const lastSegTo = { lat: routeCoordinates[closest.index + 1]?.[0] || routeCoordinates[closest.index][0], lng: routeCoordinates[closest.index + 1]?.[1] || routeCoordinates[closest.index][1] };
+        dist += calcDistance(lastSegFrom, userPos);
+        return dist;
+    }
+
+    function getCurrentStepIndex(userPos) {
+        if (!routeSteps.length) return 0;
+        const distTraveled = getDistanceAlongRoute(userPos);
+        let accumulatedDist = 0;
+        for (let i = 0; i < routeSteps.length; i++) {
+            accumulatedDist += routeSteps[i].distance || 0;
+            if (accumulatedDist >= distTraveled) return i;
+        }
+        return routeSteps.length - 1;
+    }
+
+    function updateActiveStep(stepIndex) {
+        document.querySelectorAll(".turn-step").forEach((el, idx) => {
+            el.classList.toggle("turn-step-active", idx === stepIndex);
+        });
+        const navPanel = document.getElementById("turnByTurnPanel");
+        if (navPanel) {
+            const activeStep = navPanel.querySelector(".turn-step-active");
+            if (activeStep) {
+                activeStep.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            }
+        }
+    
+        try {
+            const notified = typeof window.lastNotifiedStep !== "undefined" ? window.lastNotifiedStep : -1;
+            const steps = Array.isArray(window.routeSteps) && window.routeSteps.length ? window.routeSteps : routeSteps;
+            if (stepIndex !== notified && steps[stepIndex]) {
+                const instruction = steps[stepIndex].instruction;
+                const distance = formatDistance(steps[stepIndex].distance);
+                showToast(`${instruction} (${distance})`, "info");
+                window.lastNotifiedStep = stepIndex;
+                lastNotifiedStep = stepIndex;
+            }
+        } catch (e) {
+            // defensive: ignore notification errors
+        }
+    }
+
+    function getDistanceToDestination(userPos) {
+        if (!selectedHall) return Infinity;
+        return calcDistance(userPos, { lat: selectedHall.lat, lng: selectedHall.lng });
+    }
+
+    function checkArrival(userPos) {
+        const distToHall = getDistanceToDestination(userPos);
+        if (distToHall < arrivalThresholdMeters) {
+            return true;
+        }
+        return false;
+    }
+
+    function notifyArrival() {
+        stopGpsWatch();
+        showToast(`🎉 You've arrived at ${escapeHtml(selectedHall?.name || 'your destination')}!`, "success");
+        if (directionMarker) {
+            directionMarker.setIcon(L.divIcon({
+                html: `<div class="arrival-marker"><i class="bi bi-check-circle-fill" style="font-size:32px;color:#28a745"></i></div>`,
+                iconSize: [44, 44],
+                iconAnchor: [22, 22],
+                className: "arrival-marker",
+            }));
+        }
+    }
+
+    function updateRemainingDistance(userPos) {
+        const distToHall = getDistanceToDestination(userPos);
+        const distElement = document.getElementById("distanceRemaining");
+        if (distElement) {
+            if (distToHall < 1000) {
+                distElement.textContent = `${Math.round(distToHall)} m away`;
+            } else {
+                distElement.textContent = `${(distToHall / 1000).toFixed(2)} km away`;
+            }
+        }
     }
 
     function bearingDeg(from, to) {
@@ -701,7 +829,9 @@
             });
         }
 
+        routeCoordinates = coords.map(([lat, lng]) => [lat, lng]);
         currentRoute = routeFeature;
+        startLiveNavigation();
     }
 
     function displayRouteInfo(routeFeature) {
@@ -716,9 +846,76 @@
         const icon = routeModeInfo?.querySelector("i");
         if (icon) icon.className = `bi ${getTravelModeIcon(currentTravelMode)}`;
 
+        const distRemaining = document.getElementById("distanceRemaining");
+        if (distRemaining) {
+            distRemaining.textContent = formatDistance(summary.distance || 0);
+        }
+
         setVisible(document.getElementById("travelModeSection"), true);
         setVisible(document.getElementById("routeInfo"), true);
         updateRouteActionButtons(true);
+
+        displayTurnByTurnInstructions(routeFeature);
+    }
+
+    function getTurnIcon(instruction) {
+        if (!instruction) return "bi-arrow-up";
+        const text = instruction.toLowerCase();
+        if (text.includes("left")) return "bi-arrow-bar-left";
+        if (text.includes("right")) return "bi-arrow-bar-right";
+        if (text.includes("straight") || text.includes("continue")) return "bi-arrow-up";
+        if (text.includes("u-turn")) return "bi-arrow-return-left";
+        return "bi-arrow-up";
+    }
+
+    function displayTurnByTurnInstructions(routeFeature) {
+        const segments = routeFeature.properties?.segments || [];
+        const instructions = [];
+
+        segments.forEach((segment) => {
+            if (segment.steps && Array.isArray(segment.steps)) {
+                segment.steps.forEach((step) => {
+                    instructions.push({
+                        instruction: step.instruction || "Continue",
+                        distance: step.distance || 0,
+                        duration: step.duration || 0,
+                        maneuver: step.maneuver?.type || "unknown",
+                    });
+                });
+            }
+        });
+
+        routeSteps = instructions;
+        try { window.routeSteps = instructions; } catch (e) {}
+
+        const navPanel = document.getElementById("turnByTurnPanel");
+        if (!navPanel) return;
+
+        if (!instructions.length) {
+            navPanel.innerHTML = '<p class="text-center text-muted py-3">No turn details available</p>';
+            return;
+        }
+
+        let html = '<div class="turn-by-turn-nav">';
+        instructions.slice(0, 5).forEach((instr, idx) => {
+            const icon = getTurnIcon(instr.instruction);
+            const isFirst = idx === 0;
+            html += `
+                <div class="turn-step${isFirst ? " turn-step-active" : ""}">
+                    <div class="turn-icon">
+                        <i class="bi ${icon}"></i>
+                    </div>
+                    <div class="turn-content">
+                        <div class="turn-instruction">${escapeHtml(instr.instruction)}</div>
+                        <div class="turn-distance">${formatDistance(instr.distance)}</div>
+                    </div>
+                </div>
+            `;
+        });
+        html += '</div>';
+
+        navPanel.innerHTML = html;
+        setVisible(navPanel, true);
     }
 
     function updateRouteActionButtons(routeActive = false) {
@@ -755,7 +952,15 @@
         }
     }
 
+    function stopGpsWatch() {
+        if (gpsWatchId !== null) {
+            navigator.geolocation.clearWatch(gpsWatchId);
+            gpsWatchId = null;
+        }
+    }
+
     function clearRoute() {
+        stopGpsWatch();
         if (routeLayer) {
             routeLayer.remove();
             routeLayer = null;
@@ -763,7 +968,11 @@
         clearDirectionMarker();
         setCampusMapBounds();
         currentRoute = null;
+        routeCoordinates = [];
+        routeSteps = [];
+        lastNotifiedStep = -1;
         setVisible(document.getElementById("routeInfo"), false);
+        setVisible(document.getElementById("distanceRemainingSection"), false);
         updateRouteActionButtons(false);
     }
 
@@ -811,7 +1020,47 @@
             calculateRoute(userLocation, selectedHall);
         } else if (currentRoute && selectedHall) {
             showDirectionArrow(userLocation, selectedHall);
+            if (!gpsWatchId) startLiveNavigation();
         }
+    }
+
+    function startLiveNavigation() {
+        if (!currentRoute || !selectedHall || !userLocation) return;
+        if (gpsWatchId !== null) return;
+
+        lastNotifiedStep = -1;
+        try { window.lastNotifiedStep = -1; } catch (e) {}
+        setVisible(document.getElementById("distanceRemainingSection"), true);
+        showToast("Live navigation active. Follow the directions to reach your hall.", "info");
+
+        gpsWatchId = navigator.geolocation.watchPosition(
+            (pos) => {
+                const newLat = pos.coords.latitude;
+                const newLng = pos.coords.longitude;
+                if (!isValidCameroonCoord(newLat, newLng)) return;
+
+                userLocation = { lat: newLat, lng: newLng };
+                if (markers.userLocation) {
+                    markers.userLocation.setLatLng([newLat, newLng]);
+                }
+
+                const currentStepIdx = getCurrentStepIndex(userLocation);
+                updateActiveStep(currentStepIdx);
+                showDirectionArrow(userLocation, selectedHall);
+                updateRemainingDistance(userLocation);
+
+                map.setView([newLat, newLng], map.getZoom(), { animate: true, duration: 0.25 });
+
+                if (checkArrival(userLocation)) {
+                    notifyArrival();
+                }
+            },
+            (err) => {
+                console.warn("Geolocation watch error:", err.message);
+                showToast("Unable to update location. Check your GPS.", "warning");
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
+        );
     }
 
     function fitBoundsToHalls(halls) {
