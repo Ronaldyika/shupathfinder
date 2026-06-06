@@ -489,6 +489,12 @@
             duration: ANIMATION_MS / 1000,
         });
 
+        if (userLocation) {
+            calculateRoute(userLocation, selectedHall);
+        } else {
+            locateUser(true);
+        }
+
         const sidebar = document.getElementById("finderSidebar");
         if (sidebar?.classList.contains("panel-collapsed")) {
             sidebar.classList.remove("panel-collapsed");
